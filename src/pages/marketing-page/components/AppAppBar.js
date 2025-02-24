@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { styled, alpha } from '@mui/material/styles';
-import { Link as RouterLink } from 'react-router-dom';
+import { Link as RouterLink, useNavigate } from 'react-router-dom';
 import Box from '@mui/material/Box';
 import AppBar from '@mui/material/AppBar';
 import Toolbar from '@mui/material/Toolbar';
@@ -14,6 +14,7 @@ import MenuIcon from '@mui/icons-material/Menu';
 import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
 import ColorModeIconDropdown from '../../shared-theme/ColorModeIconDropdown';
 import Sitemark from './SitemarkIcon';
+import { useAuth } from '../../../context/AuthContext';
 
 const StyledToolbar = styled(Toolbar)(({ theme }) => ({
   display: 'flex',
@@ -31,20 +32,30 @@ const StyledToolbar = styled(Toolbar)(({ theme }) => ({
   padding: '8px 12px',
 }));
 
-// Navigation items configuration
-const navigationItems = [
-  { name: 'Home', path: '/' },
-  { name: 'Features', path: '/features' },
-  { name: 'Pricing', path: '/pricing' },
-  { name: 'Documentation', path: '/docs' },
-  { name: 'Blog', path: '/blog' }
-];
-
 export default function AppAppBar() {
   const [open, setOpen] = React.useState(false);
+  const { user, login, logout } = useAuth();
+  const navigate = useNavigate();
+
+  const navigationItems = [
+    { name: 'Home', path: '/', public: true },
+    { name: 'Dashboard', path: '/dashboard', public: false },
+    { name: 'Enter Round', path: '/rounds/new', public: false },
+    { name: 'Analytics', path: '/analytics', public: false }
+  ];
 
   const toggleDrawer = (newOpen) => () => {
     setOpen(newOpen);
+  };
+
+  const handleDevLogin = () => {
+    login({ email: 'dev@test.com', name: 'Dev User' });
+    navigate('/dashboard');
+  };
+
+  const handleLogout = () => {
+    logout();
+    navigate('/');
   };
 
   return (
@@ -65,18 +76,20 @@ export default function AppAppBar() {
               <Sitemark />
             </RouterLink>
             <Box sx={{ display: { xs: 'none', md: 'flex' } }}>
-              {navigationItems.map((item) => (
-                <Button
-                  key={item.name}
-                  component={RouterLink}
-                  to={item.path}
-                  variant="text"
-                  color="info"
-                  size="small"
-                >
-                  {item.name}
-                </Button>
-              ))}
+              {navigationItems
+                .filter(item => item.public || user)
+                .map((item) => (
+                  <Button
+                    key={item.name}
+                    component={RouterLink}
+                    to={item.path}
+                    variant="text"
+                    color="info"
+                    size="small"
+                  >
+                    {item.name}
+                  </Button>
+                ))}
             </Box>
           </Box>
           <Box
@@ -86,26 +99,51 @@ export default function AppAppBar() {
               alignItems: 'center',
             }}
           >
-            <Button
-              component={RouterLink}
-              to="/signin"
-              color="primary"
-              variant="text"
-              size="small"
-            >
-              Sign in
-            </Button>
-            <Button
-              component={RouterLink}
-              to="/signup"
-              color="primary"
-              variant="contained"
-              size="small"
-            >
-              Sign up
-            </Button>
+            {!user ? (
+              <>
+                <Button
+                  component={RouterLink}
+                  to="/signin"
+                  color="primary"
+                  variant="text"
+                  size="small"
+                >
+                  Sign in
+                </Button>
+                <Button
+                  component={RouterLink}
+                  to="/signup"
+                  color="primary"
+                  variant="contained"
+                  size="small"
+                >
+                  Sign up
+                </Button>
+                {process.env.NODE_ENV === 'development' && (
+                  <Button
+                    color="secondary"
+                    variant="outlined"
+                    size="small"
+                    onClick={handleDevLogin}
+                  >
+                    Dev Login
+                  </Button>
+                )}
+              </>
+            ) : (
+              <Button
+                color="primary"
+                variant="outlined"
+                size="small"
+                onClick={handleLogout}
+              >
+                Logout
+              </Button>
+            )}
             <ColorModeIconDropdown />
           </Box>
+
+          {/* Mobile menu - update similar changes here */}
           <Box sx={{ display: { xs: 'flex', md: 'none' }, gap: 1 }}>
             <ColorModeIconDropdown size="medium" />
             <IconButton aria-label="Menu button" onClick={toggleDrawer(true)}>
@@ -121,39 +159,54 @@ export default function AppAppBar() {
                 },
               }}
             >
+              {/* Update mobile menu content similarly */}
               <Box sx={{ p: 2, backgroundColor: 'background.default' }}>
-                <Box
-                  sx={{
-                    display: 'flex',
-                    justifyContent: 'flex-end',
-                  }}
-                >
+                <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
                   <IconButton onClick={toggleDrawer(false)}>
                     <CloseRoundedIcon />
                   </IconButton>
                 </Box>
 
-                {navigationItems.map((item) => (
-                  <MenuItem
-                    key={item.name}
-                    component={RouterLink}
-                    to={item.path}
-                    onClick={toggleDrawer(false)}
-                  >
-                    {item.name}
-                  </MenuItem>
-                ))}
+                {navigationItems
+                  .filter(item => item.public || user)
+                  .map((item) => (
+                    <MenuItem
+                      key={item.name}
+                      component={RouterLink}
+                      to={item.path}
+                      onClick={toggleDrawer(false)}
+                    >
+                      {item.name}
+                    </MenuItem>
+                  ))}
                 <Divider sx={{ my: 3 }} />
-                <MenuItem component={RouterLink} to="/signup" onClick={toggleDrawer(false)}>
-                  <Button color="primary" variant="contained" fullWidth>
-                    Sign up
-                  </Button>
-                </MenuItem>
-                <MenuItem component={RouterLink} to="/signin" onClick={toggleDrawer(false)}>
-                  <Button color="primary" variant="outlined" fullWidth>
-                    Sign in
-                  </Button>
-                </MenuItem>
+                {!user ? (
+                  <>
+                    <MenuItem component={RouterLink} to="/signup" onClick={toggleDrawer(false)}>
+                      <Button color="primary" variant="contained" fullWidth>
+                        Sign up
+                      </Button>
+                    </MenuItem>
+                    <MenuItem component={RouterLink} to="/signin" onClick={toggleDrawer(false)}>
+                      <Button color="primary" variant="outlined" fullWidth>
+                        Sign in
+                      </Button>
+                    </MenuItem>
+                    {process.env.NODE_ENV === 'development' && (
+                      <MenuItem onClick={() => { handleDevLogin(); toggleDrawer(false)(); }}>
+                        <Button color="secondary" variant="outlined" fullWidth>
+                          Dev Login
+                        </Button>
+                      </MenuItem>
+                    )}
+                  </>
+                ) : (
+                  <MenuItem onClick={() => { handleLogout(); toggleDrawer(false)(); }}>
+                    <Button color="primary" variant="outlined" fullWidth>
+                      Logout
+                    </Button>
+                  </MenuItem>
+                )}
               </Box>
             </Drawer>
           </Box>

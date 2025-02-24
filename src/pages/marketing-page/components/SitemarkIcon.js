@@ -8,21 +8,65 @@ export default function SitemarkIcon() {
   const color = theme.palette.mode === 'dark' ? '#fff' : '#000';
 
   return (
-    <Box sx={{ display: 'flex', alignItems: 'center', mr: 2 }}>
-      <Typography
-        variant="h5"
-        component="div"
-        sx={{
-          fontWeight: 700,
-          color: color,
-          letterSpacing: '.05em',
-          textDecoration: 'none',
-          fontFamily: 'monospace',
-        }}
+    <Box sx={{ 
+      display: 'flex', 
+      alignItems: 'center',
+      minWidth: '200px', // Ensure enough space for the full logo
+      mr: 3  // More margin on the right
+    }}>
+      <svg
+        width="32"
+        height="32"
+        viewBox="0 0 32 32"
+        fill="none"
+        style={{ marginRight: '12px' }}
       >
-        <span style={{ color: theme.palette.primary.main }}>ALC</span>
-        <span style={{ opacity: 0.9 }}>.AI</span>
-      </Typography>
+        <circle 
+          cx="16" 
+          cy="16" 
+          r="14" 
+          stroke={theme.palette.primary.main} 
+          strokeWidth="2"
+        />
+        <path
+          d="M16 8V24M8 16H24"
+          stroke={color}
+          strokeWidth="2"
+          strokeLinecap="round"
+        />
+      </svg>
+      <Box sx={{ 
+        display: 'flex', 
+        alignItems: 'center',
+        whiteSpace: 'nowrap'  // Prevent text wrapping
+      }}>
+        <Typography
+          variant="h5"  // Slightly larger
+          component="div"
+          sx={{
+            fontWeight: 700,
+            color: theme.palette.primary.main,
+            letterSpacing: '.02em',
+            fontFamily: '"Roboto", sans-serif',
+            marginRight: '4px'  // Space between "Stroke" and "IQ"
+          }}
+        >
+          Stroke
+        </Typography>
+        <Typography
+          variant="h5"
+          component="div"
+          sx={{
+            fontWeight: 700,
+            color: color,
+            fontStyle: 'italic',
+            fontFamily: '"Roboto", sans-serif',
+            paddingRight: '8px'  // Extra padding to prevent cropping
+          }}
+        >
+          IQ
+        </Typography>
+      </Box>
     </Box>
   );
 }

@@ -2,12 +2,10 @@ import * as React from 'react';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Container from '@mui/material/Container';
-import InputLabel from '@mui/material/InputLabel';
-import Link from '@mui/material/Link';
 import Stack from '@mui/material/Stack';
-import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
-import visuallyHidden from '@mui/utils/visuallyHidden';
+import Link from '@mui/material/Link';
+import GolfCourseIcon from '@mui/icons-material/GolfCourse'; // Add this import
 
 export default function Hero() {
   return (
@@ -15,15 +13,15 @@ export default function Hero() {
       id="hero"
       sx={(theme) => ({
         width: '100%',
-        minHeight: '80vh', // Make hero section taller
+        minHeight: '80vh',
         display: 'flex',
         alignItems: 'center',
         backgroundRepeat: 'no-repeat',
         backgroundImage:
-          'radial-gradient(ellipse 80% 50% at 50% -20%, hsl(210, 100%, 90%), transparent)',
+          'radial-gradient(ellipse 80% 50% at 50% -20%, hsl(140, 100%, 90%), transparent)', // Changed to a golf-green tint
         ...theme.applyStyles('dark', {
           backgroundImage:
-            'radial-gradient(ellipse 80% 50% at 50% -20%, hsl(210, 100%, 16%), transparent)',
+            'radial-gradient(ellipse 80% 50% at 50% -20%, hsl(140, 100%, 16%), transparent)',
         }),
       })}
     >
@@ -41,31 +39,34 @@ export default function Hero() {
           useFlexGap
           sx={{ alignItems: 'center', width: { xs: '100%', sm: '80%' } }}
         >
-          <Typography
-            variant="h1"
-            sx={{
-              display: 'flex',
-              flexDirection: { xs: 'column', sm: 'row' },
-              alignItems: 'center',
-              textAlign: 'center',
-              fontSize: 'clamp(3rem, 10vw, 4rem)',
-            }}
-          >
-            Powerful&nbsp;
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <GolfCourseIcon sx={{ fontSize: 40, color: 'primary.main' }} />
             <Typography
-              component="span"
               variant="h1"
-              sx={(theme) => ({
-                fontSize: 'inherit',
-                color: 'primary.main',
-                ...theme.applyStyles('dark', {
-                  color: 'primary.light',
-                }),
-              })}
+              sx={{
+                display: 'flex',
+                flexDirection: { xs: 'column', sm: 'row' },
+                alignItems: 'center',
+                textAlign: 'center',
+                fontSize: 'clamp(3rem, 10vw, 4rem)',
+              }}
             >
-              AI Solutions
+              Track Your&nbsp;
+              <Typography
+                component="span"
+                variant="h1"
+                sx={(theme) => ({
+                  fontSize: 'inherit',
+                  color: 'primary.main',
+                  ...theme.applyStyles('dark', {
+                    color: 'primary.light',
+                  }),
+                })}
+              >
+                Game
+              </Typography>
             </Typography>
-          </Typography>
+          </Box>
           <Typography
             variant="h2"
             sx={{
@@ -75,7 +76,7 @@ export default function Hero() {
               width: { sm: '100%', md: '90%' },
             }}
           >
-            Harness the power of large language models for your business
+            Understand your golf performance like the pros
           </Typography>
           <Typography
             sx={{
@@ -85,47 +86,34 @@ export default function Hero() {
               fontSize: '1.25rem',
             }}
           >
-            Transform your workflows with state-of-the-art AI technology. 
-            Our platform delivers custom LLM solutions tailored to your specific needs.
+            Track your strokes gained in four key areas: Off the Tee, Approach, Around the Green, 
+            and Putting. Get detailed insights into your game and identify areas for improvement.
           </Typography>
           <Stack
             direction={{ xs: 'column', sm: 'row' }}
             spacing={2}
             useFlexGap
-            sx={{ pt: 4, width: { xs: '100%', sm: '500px' } }}
+            sx={{ pt: 4, width: { xs: '100%', sm: '400px' } }}
           >
-            <InputLabel htmlFor="email-hero" sx={visuallyHidden}>
-              Email
-            </InputLabel>
-            <TextField
-              id="email-hero"
-              hiddenLabel
-              size="large"
-              variant="outlined"
-              aria-label="Enter your email address"
-              placeholder="Enter your email for early access"
-              fullWidth
-              slotProps={{
-                htmlInput: {
-                  autoComplete: 'off',
-                  'aria-label': 'Enter your email address',
-                },
-              }}
-            />
             <Button
               variant="contained"
               color="primary"
               size="large"
+              fullWidth
+              href="/signup"
               sx={{ minWidth: 'fit-content', px: 4 }}
             >
-              Join Waitlist
+              Start Tracking Free
             </Button>
           </Stack>
-          <Typography variant="caption" color="text.secondary">
-            By joining, you agree to our{' '}
-            <Link href="#" color="primary">
-              Terms & Conditions
-            </Link>
+          <Typography 
+            sx={{ 
+              textAlign: 'center', 
+              color: 'text.secondary',
+              mt: 2 
+            }}
+          >
+            Join thousands of golfers improving their game with data
           </Typography>
         </Stack>
       </Container>

@@ -5,53 +5,32 @@ import CssBaseline from '@mui/material/CssBaseline';
 import { getTheme } from './theme/theme';
 import MainLayout from './layouts/MainLayout';
 import MarketingPage from './pages/marketing-page/MarketingPage';
+import SignIn from './pages/auth/components/SignIn';
+import SignUp from './pages/auth/components/SignUp';
+import ProtectedRoute from './components/ProtectedRoute';
+import { AuthProvider } from './context/AuthContext';
+import EnterRound from './pages/rounds/EnterRound';
 
 // Create a theme context
 export const ColorModeContext = React.createContext({ toggleColorMode: () => {} });
 
-// Other page components
-const Features = () => (
+// Protected page components (remove EnterRound from here since we're importing it)
+const Dashboard = () => (
   <MainLayout>
-    <h1>Features</h1>
-    <p>Discover the powerful features of our LLM platform:</p>
+    <h1>Dashboard</h1>
+    <p>Your golf stats overview</p>
   </MainLayout>
 );
 
-const Pricing = () => (
+const Analytics = () => (
   <MainLayout>
-    <h1>Pricing</h1>
-    <p>Choose the perfect plan for your needs:</p>
-  </MainLayout>
-);
-
-const Documentation = () => (
-  <MainLayout>
-    <h1>Documentation</h1>
-    <p>Learn how to integrate and use our LLM services:</p>
-  </MainLayout>
-);
-
-const Blog = () => (
-  <MainLayout>
-    <h1>Blog</h1>
-    <p>Latest updates and insights about our LLM technology:</p>
-  </MainLayout>
-);
-
-const SignIn = () => (
-  <MainLayout>
-    <h1>Sign In</h1>
-  </MainLayout>
-);
-
-const SignUp = () => (
-  <MainLayout>
-    <h1>Sign Up</h1>
+    <h1>Analytics</h1>
+    <p>Your detailed stats and analysis</p>
   </MainLayout>
 );
 
 function App() {
-  const [mode, setMode] = useState('dark');
+  const [mode, setMode] = useState('light');
   
   const colorMode = useMemo(
     () => ({
@@ -65,22 +44,44 @@ function App() {
   const theme = useMemo(() => getTheme(mode), [mode]);
 
   return (
-    <ColorModeContext.Provider value={colorMode}>
-      <Router>
-        <ThemeProvider theme={theme}>
-          <CssBaseline />
-          <Routes>
-            <Route path="/" element={<MarketingPage />} />
-            <Route path="/features" element={<Features />} />
-            <Route path="/pricing" element={<Pricing />} />
-            <Route path="/docs" element={<Documentation />} />
-            <Route path="/blog" element={<Blog />} />
-            <Route path="/signin" element={<SignIn />} />
-            <Route path="/signup" element={<SignUp />} />
-          </Routes>
-        </ThemeProvider>
-      </Router>
-    </ColorModeContext.Provider>
+    <AuthProvider>
+      <ColorModeContext.Provider value={colorMode}>
+        <Router>
+          <ThemeProvider theme={theme}>
+            <CssBaseline />
+            <Routes>
+              <Route path="/" element={<MarketingPage />} />
+              <Route path="/signin" element={<SignIn />} />
+              <Route path="/signup" element={<SignUp />} />
+              <Route 
+                path="/dashboard" 
+                element={
+                  <ProtectedRoute>
+                    <Dashboard />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/rounds/new" 
+                element={
+                  <ProtectedRoute>
+                    <EnterRound />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/analytics" 
+                element={
+                  <ProtectedRoute>
+                    <Analytics />
+                  </ProtectedRoute>
+                } 
+              />
+            </Routes>
+          </ThemeProvider>
+        </Router>
+      </ColorModeContext.Provider>
+    </AuthProvider>
   );
 }
 
