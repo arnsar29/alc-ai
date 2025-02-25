@@ -14,6 +14,8 @@ import {
   DialogContent,
   DialogContentText,
   DialogActions,
+  CircularProgress,
+  Alert,
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -27,15 +29,26 @@ export default function Dashboard() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [roundToDelete, setRoundToDelete] = useState(null);
   const [sortBy, setSortBy] = useState('date');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const navigate = useNavigate();
 
   useEffect(() => {
     loadRounds();
   }, []);
 
-  const loadRounds = () => {
-    const loadedRounds = roundsService.getAllRounds();
-    setRounds(loadedRounds);
+  const loadRounds = async () => {
+    try {
+      setLoading(true);
+      const loadedRounds = await roundsService.getAllRounds();
+      setRounds(loadedRounds);
+      setError(null);
+    } catch (err) {
+      console.error('Error loading rounds:', err);
+      setError('Failed to load rounds. Please try again later.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const calculateTotalScore = (holes) => {
@@ -49,10 +62,15 @@ export default function Dashboard() {
     setDeleteDialogOpen(true);
   };
 
-  const handleConfirmDelete = () => {
+  const handleConfirmDelete = async () => {
     if (roundToDelete) {
-      roundsService.deleteRound(roundToDelete.id);
-      setRounds(rounds.filter(round => round.id !== roundToDelete.id));
+      try {
+        await roundsService.deleteRound(roundToDelete.id);
+        setRounds(rounds.filter(round => round.id !== roundToDelete.id));
+      } catch (err) {
+        console.error('Error deleting round:', err);
+        setError('Failed to delete round. Please try again later.');
+      }
     }
     setDeleteDialogOpen(false);
     setRoundToDelete(null);
@@ -69,9 +87,25 @@ export default function Dashboard() {
     return calculateTotalScore(a.holes) - calculateTotalScore(b.holes);
   });
 
+  if (loading) {
+    return (
+      <MainLayout>
+        <Container sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
+          <CircularProgress />
+        </Container>
+      </MainLayout>
+    );
+  }
+
   return (
     <MainLayout>
       <Container maxWidth="lg" sx={{ py: 4 }}>
+        {error && (
+          <Alert severity="error" sx={{ mb: 3 }}>
+            {error}
+          </Alert>
+        )}
+
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
           <Typography variant="h4">Dashboard</Typography>
           <Button

@@ -105,29 +105,34 @@ export default function EnterRound() {
   const canFinishRound = () => {
     return Object.keys(roundData).length > 0;
   };
-
-  const handleRoundComplete = () => {
+  
+  const handleRoundComplete = async () => {
     if (!canFinishRound()) {
       return;
     }
-
-    const roundToSave = {
-      courseId: selectedCourse,
-      courseName: courseData.name,
-      selectedTee,
-      holes: roundData,
-      totalHoles: Object.keys(roundData).length,
-      dateCreated: new Date().toISOString(),
-      id: roundId || undefined
-    };
-
-    if (isEditing) {
-      roundsService.updateRound(roundId, roundToSave);
-    } else {
-        console.log('Saving round:', roundToSave); // Debug log
-      roundsService.saveRound(roundToSave);
+  
+    try {
+      const roundToSave = {
+        courseId: selectedCourse,
+        courseName: courseData.name,
+        selectedTee,
+        holes: roundData,
+        totalHoles: Object.keys(roundData).length,
+        dateCreated: new Date().toISOString()
+      };
+  
+      if (isEditing) {
+        await roundsService.updateRound(roundId, roundToSave);
+      } else {
+        console.log('Saving new round:', roundToSave);
+        await roundsService.saveRound(roundToSave);
+      }
+      
+      navigate('/dashboard');
+    } catch (error) {
+      console.error('Error saving round:', error);
+      // Here you could add error handling UI if needed
     }
-    navigate('/dashboard');
   };
 
   const handleFinishEarly = () => {
