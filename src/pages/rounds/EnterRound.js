@@ -3,9 +3,6 @@ import {
   Container,
   Typography,
   Box,
-  Stepper,
-  Step,
-  StepLabel,
   Button,
   Dialog,
   DialogTitle,
@@ -13,8 +10,7 @@ import {
   DialogActions,
   DialogContentText,
   useMediaQuery,
-  useTheme,
-  StepButton
+  useTheme
 } from '@mui/material';
 import { useNavigate, useParams } from 'react-router-dom';
 import MainLayout from '../../layouts/MainLayout';
@@ -23,33 +19,57 @@ import HoleEntry from './components/HoleEntry';
 import { courses } from '../../data/courses';
 import { roundsService } from '../../services/roundsService';
 
-export default function EnterRound() {
-  const { roundId } = useParams();
+export default function EnterRound({ roundId: propRoundId }) {
+  // Use either the prop or the URL parameter
+  const { roundId: paramRoundId } = useParams();
+  const roundId = propRoundId || paramRoundId;
+  
+  console.log('EnterRound - Component rendering with roundId:', roundId);
+  
   const [selectedCourse, setSelectedCourse] = useState('');
   const [selectedTee, setSelectedTee] = useState('');
   const [currentHole, setCurrentHole] = useState(1);
   const [roundData, setRoundData] = useState({});
   const [finishDialogOpen, setFinishDialogOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
-
+  
   const navigate = useNavigate();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
   // Load existing round data if editing
   useEffect(() => {
-    if (roundId) {
-      const existingRound = roundsService.getRound(roundId);
-      if (existingRound) {
-        setIsEditing(true);
-        setSelectedCourse(existingRound.courseId);
-        setSelectedTee(existingRound.selectedTee);
-        setRoundData(existingRound.holes);
+    const loadRoundData = async () => {
+      console.log('EnterRound - loadRoundData triggered with roundId:', roundId);
+      
+      if (roundId) {
+        try {
+          console.log('EnterRound - Calling roundsService.getRoundById with:', roundId);
+          const existingRound = await roundsService.getRoundById(roundId);
+          console.log('EnterRound - Retrieved round data:', existingRound);
+          
+          if (existingRound) {
+            console.log('EnterRound - Setting state with round data');
+            setIsEditing(true);
+            setSelectedCourse(existingRound.courseId);
+            console.log('EnterRound - Set selectedCourse to:', existingRound.courseId);
+            setSelectedTee(existingRound.selectedTee);
+            console.log('EnterRound - Set selectedTee to:', existingRound.selectedTee);
+            setRoundData(existingRound.holes || {});
+            console.log('EnterRound - Set roundData to:', existingRound.holes);
+          } else {
+            console.log('EnterRound - No round data found for ID:', roundId);
+          }
+        } catch (error) {
+          console.error('EnterRound - Error loading round data:', error);
+        }
       }
-    }
+    };
+
+    loadRoundData();
   }, [roundId]);
 
-  // Reset round data when course changes
+  // Reset round data when course changes (if not editing)
   useEffect(() => {
     if (!isEditing && selectedCourse) {
       setRoundData({});
@@ -87,15 +107,46 @@ export default function EnterRound() {
     setRoundData(prevData => {
       const newData = {
         ...prevData,
-        [holeNumber]: shots
+        [holeNumber]: JSON.parse(JSON.stringify(shots)) // Deep copy to avoid reference issues
       };
       console.log('After update - roundData:', newData);
       return newData;
     });
   };
 
+  const validateCurrentHole = () => {
+    // Get current hole data
+    const currentShots = roundData[currentHole] || [];
+    
+    // If no shots, no validation needed
+    if (currentShots.length === 0) return true;
+    
+    // Check if all shots have required data
+    const isValid = !currentShots.some(shot => 
+      !shot.lieType || 
+      !shot.distance || 
+      (typeof shot.distance === 'string' && (!/^\d+$/.test(shot.distance) || parseInt(shot.distance, 10) <= 0)) || 
+      (typeof shot.distance === 'number' && shot.distance <= 0)
+    );
+    
+    if (!isValid) {
+      alert("Please complete all shot information before continuing.");
+    }
+    
+    return isValid;
+  };
+
   const handleHoleClick = (holeNumber) => {
-    setCurrentHole(holeNumber + 1);
+    if (validateCurrentHole()) {
+      // Auto-save current hole data
+      const currentShots = roundData[currentHole] || [];
+      if (currentShots.length > 0) {
+        handleHoleComplete(currentHole, currentShots);
+      }
+      
+      // Switch to the selected hole
+      setCurrentHole(holeNumber + 1);
+    }
   };
 
   const isHoleCompleted = (holeNumber) => {
@@ -139,8 +190,14 @@ export default function EnterRound() {
     if (!canFinishRound()) {
       return;
     }
-    setFinishDialogOpen(false);
-    handleRoundComplete();
+    
+    if (validateCurrentHole()) {
+      setFinishDialogOpen(false);
+      handleRoundComplete();
+    } else {
+      // Keep dialog open if validation fails
+      setFinishDialogOpen(false);
+    }
   };
 
   return (
@@ -157,7 +214,7 @@ export default function EnterRound() {
               onClick={() => setFinishDialogOpen(true)}
               disabled={!canFinishRound()}
             >
-              Finish Round
+              Save Round
             </Button>
           )}
         </Box>
@@ -172,32 +229,33 @@ export default function EnterRound() {
 
         {selectedCourse && selectedTee && (
           <>
-<Box sx={{ 
-  overflowX: 'auto', 
-  display: 'flex', 
-  gap: 1, 
-  width: '100%',
-  paddingBottom: 1
-}}>
-  {[...Array(18)].map((_, index) => (
-    <Button
-      key={index}
-      variant={currentHole === index + 1 ? 'contained' : 'outlined'}
-      color={isHoleCompleted(index + 1) ? 'success' : 'primary'}
-      onClick={() => handleHoleClick(index)}
-      sx={{ 
-        minWidth: 'auto', 
-        padding: '6px 12px',
-        flexShrink: 0 
-      }}
-    >
-      {index + 1}
-    </Button>
-  ))}
-</Box>
+            <Box sx={{ 
+              overflowX: 'auto', 
+              display: 'flex', 
+              gap: 1, 
+              width: '100%',
+              paddingBottom: 1
+            }}>
+              {[...Array(18)].map((_, index) => (
+                <Button
+                  key={index}
+                  variant={currentHole === index + 1 ? 'contained' : 'outlined'}
+                  color={isHoleCompleted(index + 1) ? 'success' : 'primary'}
+                  onClick={() => handleHoleClick(index)}
+                  sx={{ 
+                    minWidth: 'auto', 
+                    padding: '6px 12px',
+                    flexShrink: 0 
+                  }}
+                >
+                  {index + 1}
+                </Button>
+              ))}
+            </Box>
 
             {currentHoleData && (
               <HoleEntry
+                key={`hole-${currentHole}`}
                 holeNumber={currentHole}
                 par={currentHoleData.par}
                 teeDistance={currentHoleData.teeDistances[selectedTee]}
@@ -209,13 +267,36 @@ export default function EnterRound() {
             <Box sx={{ mt: 3, display: 'flex', justifyContent: 'space-between' }}>
               <Button
                 disabled={currentHole === 1}
-                onClick={() => setCurrentHole(prev => prev - 1)}
+                onClick={() => {
+                  if (validateCurrentHole()) {
+                    // Auto-save current hole data
+                    const currentShots = roundData[currentHole] || [];
+                    if (currentShots.length > 0) {
+                      handleHoleComplete(currentHole, currentShots);
+                    }
+                    // Move to previous hole
+                    setCurrentHole(prev => prev - 1);
+                  }
+                }}
+                variant="outlined"
               >
                 Previous Hole
               </Button>
               <Button
                 disabled={currentHole === 18}
-                onClick={() => setCurrentHole(prev => prev + 1)}
+                onClick={() => {
+                  if (validateCurrentHole()) {
+                    // Auto-save current hole data
+                    const currentShots = roundData[currentHole] || [];
+                    if (currentShots.length > 0) {
+                      handleHoleComplete(currentHole, currentShots);
+                    }
+                    // Move to next hole
+                    setCurrentHole(prev => prev + 1);
+                  }
+                }}
+                variant="contained"
+                color="primary"
               >
                 Next Hole
               </Button>
@@ -227,10 +308,10 @@ export default function EnterRound() {
           open={finishDialogOpen}
           onClose={() => setFinishDialogOpen(false)}
         >
-          <DialogTitle>Finish Round?</DialogTitle>
+          <DialogTitle>Save Round?</DialogTitle>
           <DialogContent>
             <DialogContentText>
-              Are you sure you want to finish recording this round? 
+              Are you sure you want to save this round? 
               {currentHole < 18 && " You haven't completed all 18 holes."}
             </DialogContentText>
           </DialogContent>
@@ -242,7 +323,7 @@ export default function EnterRound() {
               color="primary"
               disabled={!canFinishRound()}
             >
-              Finish Round
+              Save Round
             </Button>
           </DialogActions>
         </Dialog>

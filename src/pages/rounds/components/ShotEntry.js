@@ -9,7 +9,8 @@ import {
   Grid,
   Typography,
   IconButton,
-  Tooltip
+  Tooltip,
+  FormHelperText
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import { lieTypes, clubTypes } from '../../../data/courses';
@@ -25,34 +26,55 @@ export default function ShotEntry({
   isFirstShot = false,
   prefilledDistance = null,
   onDelete,
-  isHoleCompleted = false // New prop to track if hole is completed
+  isHoleCompleted = false
 }) {
+  const [distanceError, setDistanceError] = useState(false);
+  const [lieError, setLieError] = useState(false);
   const [useCustomDistance, setUseCustomDistance] = useState(false);
   const [localDistance, setLocalDistance] = useState(distance || '');
 
   // Reset custom distance state when prefilledDistance changes
   useEffect(() => {
-    // If hole is not completed and it's the first shot, reset custom distance
     if (isFirstShot && !isHoleCompleted) {
       setUseCustomDistance(false);
       setLocalDistance(prefilledDistance || '');
     }
   }, [prefilledDistance, isFirstShot, isHoleCompleted]);
 
+  useEffect(() => {
+    if (distance !== localDistance) {
+      setLocalDistance(distance || '');
+    }
+  }, [distance, localDistance]);
+
   const handleDistanceChange = (e) => {
-    const newDistance = e.target.value;
+    const value = e.target.value;
+    
+    // Check if value is a valid positive number
+    const isValid = /^\d+$/.test(value) && parseInt(value, 10) > 0;
+    
+    // Update error state
+    setDistanceError(!isValid && value !== '');
     
     // If it's the first shot, mark as custom distance
     if (isFirstShot) {
       setUseCustomDistance(true);
     }
     
-    // Update local state and inform parent
-    setLocalDistance(newDistance);
-    onDistanceChange(newDistance);
+    // Update local state
+    setLocalDistance(value);
+    
+    // Only inform parent if value is valid or empty
+    if ((isValid || value === '') && onDistanceChange) {
+      onDistanceChange(value === '' ? '' : parseInt(value, 10));
+    }
   };
 
-  // Determine which distance to display
+  const handleLieBlur = () => {
+    setLieError(!lieType);
+  };
+
+  // Calculate display distance within the render function
   const displayDistance = 
     isFirstShot && !useCustomDistance && prefilledDistance !== null 
       ? prefilledDistance 
@@ -74,12 +96,16 @@ export default function ShotEntry({
       </Box>
       <Grid container spacing={2}>
         <Grid item xs={12} md={4}>
-          <FormControl fullWidth>
+          <FormControl fullWidth error={lieError}>
             <InputLabel>Lie</InputLabel>
             <Select
               value={lieType || ''}
               label="Lie"
-              onChange={(e) => onLieChange(e.target.value)}
+              onChange={(e) => {
+                setLieError(false); // Clear error when value changes
+                onLieChange(e.target.value);
+              }}
+              onBlur={handleLieBlur}
             >
               {lieTypes.map((lie) => (
                 <MenuItem key={lie.id} value={lie.id}>
@@ -87,6 +113,9 @@ export default function ShotEntry({
                 </MenuItem>
               ))}
             </Select>
+            {lieError && (
+              <FormHelperText>Select which lie you played this shot from</FormHelperText>
+            )}
           </FormControl>
         </Grid>
         <Grid item xs={12} md={4}>
@@ -96,16 +125,10 @@ export default function ShotEntry({
             type="number"
             value={displayDistance}
             onChange={handleDistanceChange}
-            helperText={
-              isFirstShot && prefilledDistance !== null && !useCustomDistance
-                ? "Default distance from tee"
-                : ""
-            }
-            InputProps={{
-              style: { 
-                // Ensure helper text is visible and doesn't overlap
-                position: 'relative' 
-              }
+            error={distanceError}
+            helperText={distanceError ? "Please enter a positive number" : ""}
+            inputProps={{ 
+              min: 1
             }}
           />
         </Grid>

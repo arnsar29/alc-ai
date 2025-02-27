@@ -10,24 +10,16 @@ import SignUp from './pages/auth/components/SignUp';
 import ProtectedRoute from './components/ProtectedRoute';
 import { AuthProvider } from './context/AuthContext';
 import EnterRound from './pages/rounds/EnterRound';
+import Analytics from './pages/analytics/Analytics';
+import EditRound from './pages/rounds/EditRound';
+import Dashboard from './pages/dashboard/Dashboard';
+import FirebaseTest from './components/FirebaseTest';
+import { useNavigate } from 'react-router-dom';
 
 // Create a theme context
 export const ColorModeContext = React.createContext({ toggleColorMode: () => {} });
 
 // Protected page components (remove EnterRound from here since we're importing it)
-const Dashboard = () => (
-  <MainLayout>
-    <h1>Dashboard</h1>
-    <p>Your golf stats overview</p>
-  </MainLayout>
-);
-
-const Analytics = () => (
-  <MainLayout>
-    <h1>Analytics</h1>
-    <p>Your detailed stats and analysis</p>
-  </MainLayout>
-);
 
 function App() {
   const [mode, setMode] = useState('light');
@@ -77,6 +69,15 @@ function App() {
                   </ProtectedRoute>
                 } 
               />
+              <Route 
+                path="/rounds/edit/:id" 
+                element={
+                  <ProtectedRoute>
+                    <EditRound />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route path="/firebase-test" element={<FirebaseTest />} />
             </Routes>
           </ThemeProvider>
         </Router>

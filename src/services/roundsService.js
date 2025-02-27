@@ -6,6 +6,7 @@ import {
   doc, 
   deleteDoc, 
   updateDoc, 
+  getDoc, 
   query, 
   orderBy 
 } from 'firebase/firestore';
@@ -49,11 +50,38 @@ export const roundsService = {
     }
   },
 
-  updateRound: async (roundId, updatedData, userId = 'dev_user') => {
+// Add this to roundsService.js to the getRoundById function:
+getRoundById: async (id) => {
+  try {
+    console.log('roundsService - Getting round with ID:', id);
+    const roundRef = doc(db, ROUNDS_COLLECTION, id);
+    const roundDoc = await getDoc(roundRef);
+    
+    if (!roundDoc.exists()) {
+      console.log('roundsService - Round not found for ID:', id);
+      throw new Error('Round not found');
+    }
+    
+    const data = {
+      id: roundDoc.id,
+      ...roundDoc.data()
+    };
+    console.log('roundsService - Successfully retrieved round data:', data);
+    return data;
+  } catch (error) {
+    console.error('roundsService - Error getting round by ID:', error);
+    throw error;
+  }
+},
+
+  updateRound: async (id, data) => {
     try {
-      const roundRef = doc(db, ROUNDS_COLLECTION, roundId);
-      await updateDoc(roundRef, updatedData);
-      return { id: roundId, ...updatedData };
+      const roundRef = doc(db, ROUNDS_COLLECTION, id);
+      await updateDoc(roundRef, data);
+      return {
+        id,
+        ...data
+      };
     } catch (error) {
       console.error('Error updating round:', error);
       throw error;

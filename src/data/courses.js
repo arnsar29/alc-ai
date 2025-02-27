@@ -70,7 +70,8 @@ export const courses = [
     { id: 'fairway', name: 'Fairway' },
     { id: 'rough', name: 'Rough' },
     { id: 'sand', name: 'Bunker' },
-    { id: 'green', name: 'Green' }
+    { id: 'green', name: 'Green' },
+    { id: 'recovery', name: 'Recovery' }
   ];
   
   export const clubTypes = [
