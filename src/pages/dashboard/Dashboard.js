@@ -1,3 +1,4 @@
+// src/pages/dashboard/Dashboard.js
 import React, { useState, useEffect } from 'react';
 import {
   Container,
@@ -34,8 +35,12 @@ import { useNavigate } from 'react-router-dom';
 import MainLayout from '../../layouts/MainLayout';
 import { roundsService } from '../../services/roundsService';
 import { strokesGainedService } from '../../services/strokesGainedService';
+import { useAuth } from '../../context/AuthContext';
+import { userService } from '../../services/userService';
+import { UserProfile } from '../../models/UserProfile';
 
 export default function Dashboard() {
+  const { currentUser } = useAuth();
   const [rounds, setRounds] = useState([]);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [roundToDelete, setRoundToDelete] = useState(null);
@@ -46,25 +51,56 @@ export default function Dashboard() {
   const [strokesGainedData, setStrokesGainedData] = useState(null);
   const [timeframe, setTimeframe] = useState('all'); // 'all', 'month', '6months', 'year'
   const [selectedCourseId, setSelectedCourseId] = useState(null);
+  const [userProfile, setUserProfile] = useState(null);
   
   const navigate = useNavigate();
 
+  // Load user profile on component mount
+  useEffect(() => {
+    const loadUserProfile = async () => {
+      if (!currentUser) return;
+      
+      try {
+        const loadedProfile = await userService.getUserProfile(currentUser.uid);
+        setUserProfile(loadedProfile || new UserProfile({ id: currentUser.uid }));
+      } catch (error) {
+        console.error('Error loading user profile:', error);
+      }
+    };
+    
+    loadUserProfile();
+  }, [currentUser]);
+
+  // Load rounds on component mount
   useEffect(() => {
     loadRounds();
   }, []);
 
   useEffect(() => {
-    if (rounds.length > 0) {
-      // Calculate strokes gained when rounds change
-      const options = {
-        timeframe: timeframe !== 'all' ? timeframe : null,
-        courseId: selectedCourseId
-      };
-      
-      const strokesGained = strokesGainedService.calculateAggregateStrokesGained(rounds, options);
-      setStrokesGainedData(strokesGained);
-    }
-  }, [rounds, timeframe, selectedCourseId]);
+    const calculateStrokesGained = async () => {
+      if (rounds.length > 0 && userProfile) {
+        try {
+          console.log("Calculating strokes gained with rounds:", rounds);
+          console.log("User profile:", userProfile);
+          
+          const options = {
+            timeframe: timeframe !== 'all' ? timeframe : null,
+            courseId: selectedCourseId
+          };
+          
+          const strokesGained = await strokesGainedService.calculateAggregateStrokesGained(rounds, userProfile, options);
+          console.log("Strokes gained result:", strokesGained);
+          setStrokesGainedData(strokesGained);
+        } catch (error) {
+          console.error('Error calculating strokes gained:', error);
+        }
+      } else {
+        console.log("Not calculating strokes gained - rounds:", rounds.length, "userProfile:", !!userProfile);
+      }
+    };
+    
+    calculateStrokesGained();
+  }, [rounds, timeframe, selectedCourseId, userProfile]);
 
   const loadRounds = async () => {
     try {
@@ -124,20 +160,33 @@ export default function Dashboard() {
   };
 
   // Calculate tee-to-green and overall strokes gained for a round
-  const calculateExtendedStrokesGained = (round) => {
-    const sg = strokesGainedService.calculateRoundStrokesGained(round);
-    
-    // Calculate tee-to-green (all strokes gained minus putting)
-    const teeToGreen = sg.byCategory.tee + sg.byCategory.approach + sg.byCategory.around;
-    
-    return {
-      ...sg,
-      byCategory: {
-        ...sg.byCategory,
-        teeToGreen: parseFloat(teeToGreen.toFixed(2)),
-        overall: sg.total
-      }
-    };
+  const calculateExtendedStrokesGained = async (round) => {
+    try {
+      const sg = await strokesGainedService.calculateRoundStrokesGained(round, userProfile);
+      
+      // Calculate tee-to-green (all strokes gained minus putting)
+      const teeToGreen = (sg.byCategory.tee || 0) + (sg.byCategory.approach || 0) + (sg.byCategory.around || 0);
+      
+      return {
+        ...sg,
+        byCategory: {
+          ...sg.byCategory,
+          teeToGreen: parseFloat(teeToGreen.toFixed(2))
+        }
+      };
+    } catch (error) {
+      console.error('Error calculating strokes gained for round:', error);
+      return {
+        total: 0,
+        byCategory: {
+          tee: 0,
+          approach: 0,
+          around: 0,
+          putting: 0,
+          teeToGreen: 0
+        }
+      };
+    }
   };
 
   const sortedRounds = [...rounds].sort((a, b) => {
@@ -175,6 +224,13 @@ export default function Dashboard() {
           >
             New Round
           </Button>
+          <Button //to remove from here
+          variant="contained" 
+          color="warning" 
+          onClick={() => import('../../scripts/initializeStrokesGainedTables').then(module => module.default())}
+        >
+          Initialize SG Tables 
+        </Button> 
         </Box>
 
         {rounds.length > 0 && (
@@ -295,6 +351,11 @@ export default function Dashboard() {
           // Strokes Gained Tab
           rounds.length > 0 ? (
             <>
+              <Typography variant="h6">Debug: Strokes Gained Tab is rendering</Typography>
+              <Typography>Rounds: {rounds.length}</Typography>
+              <Typography>Has strokesGainedData: {strokesGainedData ? 'Yes' : 'No'}</Typography>
+              <Typography>User Profile: {userProfile ? `Handicap: ${userProfile.handicap}, Gender: ${userProfile.gender}` : 'Not loaded'}</Typography>
+
               <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
                 <Button
                   variant={timeframe === 'all' ? 'contained' : 'outlined'}
@@ -348,8 +409,8 @@ export default function Dashboard() {
                     <Card>
                       <CardContent>
                         <Typography variant="h6" gutterBottom>Total Strokes Gained</Typography>
-                        <Typography variant="h3" color={strokesGainedData.average?.total > 0 ? 'success.main' : 'error.main'}>
-                          {strokesGainedData.average?.total > 0 ? '+' : ''}{strokesGainedData.average?.total || 0}
+                        <Typography variant="h3" color={(strokesGainedData.average?.total || 0) > 0 ? 'success.main' : 'error.main'}>
+                          {(strokesGainedData.average?.total || 0) > 0 ? '+' : ''}{strokesGainedData.average?.total || 0}
                         </Typography>
                         <Typography variant="body2" color="text.secondary">
                           Based on {strokesGainedData.rounds} rounds
@@ -363,15 +424,9 @@ export default function Dashboard() {
                     <Card>
                       <CardContent>
                         <Typography variant="h6" gutterBottom>Tee to Green</Typography>
-                        <Typography variant="h3" color={(strokesGainedData.average?.byCategory.tee + 
-                                                       strokesGainedData.average?.byCategory.approach + 
-                                                       strokesGainedData.average?.byCategory.around) > 0 ? 'success.main' : 'error.main'}>
-                          {(strokesGainedData.average?.byCategory.tee + 
-                            strokesGainedData.average?.byCategory.approach + 
-                            strokesGainedData.average?.byCategory.around) > 0 ? '+' : ''}
-                          {parseFloat((strokesGainedData.average?.byCategory.tee + 
-                                     strokesGainedData.average?.byCategory.approach + 
-                                     strokesGainedData.average?.byCategory.around).toFixed(2)) || 0}
+                        <Typography variant="h3" color={(strokesGainedData.average?.byCategory.teeToGreen || 0) > 0 ? 'success.main' : 'error.main'}>
+                          {(strokesGainedData.average?.byCategory.teeToGreen || 0) > 0 ? '+' : ''}
+                          {strokesGainedData.average?.byCategory.teeToGreen || 0}
                         </Typography>
                         <Typography variant="body2" color="text.secondary">
                           All shots except putting
@@ -385,220 +440,231 @@ export default function Dashboard() {
                     <Card>
                       <CardContent>
                         <Typography variant="h6" gutterBottom>Strokes Gained by Category</Typography>
-                        <Box sx={{ mt: 2 }}>
-                          <Typography variant="body2">Off the Tee</Typography>
-                          <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                            <Box sx={{ 
-                              width: '100%', 
-                              height: 10, 
-                              bgcolor: 'grey.300', 
-                              borderRadius: 5,
-                              position: 'relative',
-                              overflow: 'hidden'
-                            }}>
-                              <Box sx={{ 
-                                position: 'absolute',
-                                left: '50%',
-                                height: '100%',
-                                width: `${Math.min(Math.abs(strokesGainedData.average?.byCategory.tee || 0) * 20, 100)}%`,
-                                bgcolor: (strokesGainedData.average?.byCategory.tee || 0) > 0 ? 'success.main' : 'error.main',
-                                transform: `translateX(${(strokesGainedData.average?.byCategory.tee || 0) > 0 ? '0%' : '-100%'})`,
-                              }}/>
-                            </Box>
-                            <Typography variant="body2" sx={{ ml: 1, minWidth: 50, textAlign: 'right' }}>
-                              {(strokesGainedData.average?.byCategory.tee || 0) > 0 ? '+' : ''}
-                              {strokesGainedData.average?.byCategory.tee || 0}
-                            </Typography>
-                          </Box>
-                          
-                          <Typography variant="body2">Approach</Typography>
-                          <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                            <Box sx={{ 
-                              width: '100%', 
-                              height: 10, 
-                              bgcolor: 'grey.300', 
-                              borderRadius: 5,
-                              position: 'relative',
-                              overflow: 'hidden'
-                            }}>
-                              <Box sx={{ 
-                                position: 'absolute',
-                                left: '50%',
-                                height: '100%',
-                                width: `${Math.min(Math.abs(strokesGainedData.average?.byCategory.approach || 0) * 20, 100)}%`,
-                                bgcolor: (strokesGainedData.average?.byCategory.approach || 0) > 0 ? 'success.main' : 'error.main',
-                                transform: `translateX(${(strokesGainedData.average?.byCategory.approach || 0) > 0 ? '0%' : '-100%'})`,
-                              }}/>
-                            </Box>
-                            <Typography variant="body2" sx={{ ml: 1, minWidth: 50, textAlign: 'right' }}>
-                              {(strokesGainedData.average?.byCategory.approach || 0) > 0 ? '+' : ''}
-                              {strokesGainedData.average?.byCategory.approach || 0}
-                            </Typography>
-                          </Box>
-                          
-                          <Typography variant="body2">Around the Green</Typography>
-                          <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                            <Box sx={{ 
-                              width: '100%', 
-                              height: 10, 
-                              bgcolor: 'grey.300', 
-                              borderRadius: 5,
-                              position: 'relative',
-                              overflow: 'hidden'
-                            }}>
-                              <Box sx={{ 
-                                position: 'absolute',
-                                left: '50%',
-                                height: '100%',
-                                width: `${Math.min(Math.abs(strokesGainedData.average?.byCategory.around || 0) * 20, 100)}%`,
-                                bgcolor: (strokesGainedData.average?.byCategory.around || 0) > 0 ? 'success.main' : 'error.main',
-                                transform: `translateX(${(strokesGainedData.average?.byCategory.around || 0) > 0 ? '0%' : '-100%'})`,
-                              }}/>
-                            </Box>
-                            <Typography variant="body2" sx={{ ml: 1, minWidth: 50, textAlign: 'right' }}>
-                              {(strokesGainedData.average?.byCategory.around || 0) > 0 ? '+' : ''}
-                              {strokesGainedData.average?.byCategory.around || 0}
-                            </Typography>
-                          </Box>
-                          
-                          <Typography variant="body2">Putting</Typography>
-                          <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                            <Box sx={{ 
-                              width: '100%', 
-                              height: 10, 
-                              bgcolor: 'grey.300', 
-                              borderRadius: 5,
-                              position: 'relative',
-                              overflow: 'hidden'
-                            }}>
-                              <Box sx={{ 
-                                position: 'absolute',
-                                left: '50%',
-                                height: '100%',
-                                width: `${Math.min(Math.abs(strokesGainedData.average?.byCategory.putting || 0) * 20, 100)}%`,
-                                bgcolor: (strokesGainedData.average?.byCategory.putting || 0) > 0 ? 'success.main' : 'error.main',
-                                transform: `translateX(${(strokesGainedData.average?.byCategory.putting || 0) > 0 ? '0%' : '-100%'})`,
-                              }}/>
-                            </Box>
-                            <Typography variant="body2" sx={{ ml: 1, minWidth: 50, textAlign: 'right' }}>
-                              {(strokesGainedData.average?.byCategory.putting || 0) > 0 ? '+' : ''}
-                              {strokesGainedData.average?.byCategory.putting || 0}
-                            </Typography>
-                          </Box>
-                        </Box>
-                      </CardContent>
-                    </Card>
-                  </Grid>
-                  
-                  {/* Individual Round Strokes Gained */}
-                  <Grid item xs={12}>
-                    <Card>
-                      <CardContent>
-                        <Typography variant="h6" gutterBottom>Strokes Gained by Round</Typography>
-                        <TableContainer component={Paper} variant="outlined">
-                          <Table>
-                            <TableHead>
-                              <TableRow>
-                                <TableCell>Date</TableCell>
-                                <TableCell>Course</TableCell>
-                                <TableCell align="right">Overall</TableCell>
-                                <TableCell align="right">Tee to Green</TableCell>
-                                <TableCell align="right">Off Tee</TableCell>
-                                <TableCell align="right">Approach</TableCell>
-                                <TableCell align="right">Around</TableCell>
-                                <TableCell align="right">Putting</TableCell>
-                              </TableRow>
-                            </TableHead>
-                            <TableBody>
-                              {rounds.map(round => {
-                                const sg = calculateExtendedStrokesGained(round);
-                                return (
-                                  <TableRow key={round.id}>
-                                    <TableCell>{new Date(round.dateCreated).toLocaleDateString()}</TableCell>
-                                    <TableCell>{round.courseName}</TableCell>
-                                    <TableCell align="right" sx={{ 
-                                      color: sg.total > 0 ? 'success.main' : 'error.main',
-                                      fontWeight: 'bold'
-                                    }}>
-                                      {sg.total > 0 ? '+' : ''}{sg.total}
-                                    </TableCell>
-                                    <TableCell align="right" sx={{ 
-                                      color: sg.byCategory.teeToGreen > 0 ? 'success.main' : 'error.main' 
-                                    }}>
-                                      {sg.byCategory.teeToGreen > 0 ? '+' : ''}{sg.byCategory.teeToGreen}
-                                    </TableCell>
-                                    <TableCell align="right" sx={{ 
-                                      color: sg.byCategory.tee > 0 ? 'success.main' : 'error.main' 
-                                    }}>
-                                      {sg.byCategory.tee > 0 ? '+' : ''}{sg.byCategory.tee}
-                                    </TableCell>
-                                    <TableCell align="right" sx={{ 
-                                      color: sg.byCategory.approach > 0 ? 'success.main' : 'error.main' 
-                                    }}>
-                                      {sg.byCategory.approach > 0 ? '+' : ''}{sg.byCategory.approach}
-                                    </TableCell>
-                                    <TableCell align="right" sx={{ 
-                                      color: sg.byCategory.around > 0 ? 'success.main' : 'error.main' 
-                                    }}>
-                                      {sg.byCategory.around > 0 ? '+' : ''}{sg.byCategory.around}
-                                    </TableCell>
-                                    <TableCell align="right" sx={{ 
-                                      color: sg.byCategory.putting > 0 ? 'success.main' : 'error.main' 
-                                    }}>
-                                      {sg.byCategory.putting > 0 ? '+' : ''}{sg.byCategory.putting}
-                                    </TableCell>
-                                  </TableRow>
-                                );
-                              })}
-                            </TableBody>
-                          </Table>
-                        </TableContainer>
-                      </CardContent>
-                    </Card>
-                  </Grid>
-                </Grid>
-              )}
-            </>
-          ) : (
-            <Grid item xs={12}>
-              <Card sx={{ textAlign: 'center', py: 4 }}>
-                <CardContent>
-                  <Typography variant="h6" color="text.secondary">
-                    No rounds recorded yet
-                  </Typography>
-                  <Button
-                    variant="outlined"
-                    startIcon={<AddIcon />}
-                    onClick={() => navigate('/rounds/new')}
-                    sx={{ mt: 2 }}
-                  >
-                    Record Your First Round
-                  </Button>
-                </CardContent>
-              </Card>
-            </Grid>
-          )
-        )}
+<Box sx={{ mt: 2 }}>
+<Typography variant="body2">Off the Tee</Typography>
+<Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+  <Box sx={{ 
+    width: '100%', 
+    height: 10, 
+    bgcolor: 'grey.300', 
+    borderRadius: 5,
+    position: 'relative',
+    overflow: 'hidden'
+  }}>
+    <Box sx={{ 
+      position: 'absolute',
+      left: '50%',
+      height: '100%',
+      width: `${Math.min(Math.abs(strokesGainedData.average?.byCategory.tee || 0) * 20, 100)}%`,
+      bgcolor: (strokesGainedData.average?.byCategory.tee || 0) > 0 ? 'success.main' : 'error.main',
+      transform: `translateX(${(strokesGainedData.average?.byCategory.tee || 0) > 0 ? '0%' : '-100%'})`,
+    }}/>
+  </Box>
+  <Typography variant="body2" sx={{ ml: 1, minWidth: 50, textAlign: 'right' }}>
+    {(strokesGainedData.average?.byCategory.tee || 0) > 0 ? '+' : ''}
+    {strokesGainedData.average?.byCategory.tee || 0}
+  </Typography>
+</Box>
 
-        <Dialog
-          open={deleteDialogOpen}
-          onClose={() => setDeleteDialogOpen(false)}
-        >
-          <DialogTitle>Delete Round</DialogTitle>
-          <DialogContent>
-            <DialogContentText>
-              Are you sure you want to delete this round at {roundToDelete?.courseName}? 
-              This action cannot be undone.
-            </DialogContentText>
-          </DialogContent>
-          <DialogActions>
-            <Button onClick={() => setDeleteDialogOpen(false)}>Cancel</Button>
-            <Button onClick={handleConfirmDelete} color="error" variant="contained">
-              Delete
-            </Button>
-          </DialogActions>
-        </Dialog>
-      </Container>
-    </MainLayout>
-  );
+<Typography variant="body2">Approach</Typography>
+<Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+  <Box sx={{ 
+    width: '100%', 
+    height: 10, 
+    bgcolor: 'grey.300', 
+    borderRadius: 5,
+    position: 'relative',
+    overflow: 'hidden'
+  }}>
+    <Box sx={{ 
+      position: 'absolute',
+      left: '50%',
+      height: '100%',
+      width: `${Math.min(Math.abs(strokesGainedData.average?.byCategory.approach || 0) * 20, 100)}%`,
+      bgcolor: (strokesGainedData.average?.byCategory.approach || 0) > 0 ? 'success.main' : 'error.main',
+      transform: `translateX(${(strokesGainedData.average?.byCategory.approach || 0) > 0 ? '0%' : '-100%'})`,
+    }}/>
+  </Box>
+  <Typography variant="body2" sx={{ ml: 1, minWidth: 50, textAlign: 'right' }}>
+    {(strokesGainedData.average?.byCategory.approach || 0) > 0 ? '+' : ''}
+    {strokesGainedData.average?.byCategory.approach || 0}
+  </Typography>
+</Box>
+
+<Typography variant="body2">Around the Green</Typography>
+<Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+  <Box sx={{ 
+    width: '100%', 
+    height: 10, 
+    bgcolor: 'grey.300', 
+    borderRadius: 5,
+    position: 'relative',
+    overflow: 'hidden'
+  }}>
+    <Box sx={{ 
+      position: 'absolute',
+      left: '50%',
+      height: '100%',
+      width: `${Math.min(Math.abs(strokesGainedData.average?.byCategory.around || 0) * 20, 100)}%`,
+      bgcolor: (strokesGainedData.average?.byCategory.around || 0) > 0 ? 'success.main' : 'error.main',
+      transform: `translateX(${(strokesGainedData.average?.byCategory.around || 0) > 0 ? '0%' : '-100%'})`,
+    }}/>
+  </Box>
+  <Typography variant="body2" sx={{ ml: 1, minWidth: 50, textAlign: 'right' }}>
+    {(strokesGainedData.average?.byCategory.around || 0) > 0 ? '+' : ''}
+    {strokesGainedData.average?.byCategory.around || 0}
+  </Typography>
+</Box>
+
+<Typography variant="body2">Putting</Typography>
+<Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+  <Box sx={{ 
+    width: '100%', 
+    height: 10, 
+    bgcolor: 'grey.300', 
+    borderRadius: 5,
+    position: 'relative',
+    overflow: 'hidden'
+  }}>
+    <Box sx={{ 
+      position: 'absolute',
+      left: '50%',
+      height: '100%',
+      width: `${Math.min(Math.abs(strokesGainedData.average?.byCategory.putting || 0) * 20, 100)}%`,
+      bgcolor: (strokesGainedData.average?.byCategory.putting || 0) > 0 ? 'success.main' : 'error.main',
+      transform: `translateX(${(strokesGainedData.average?.byCategory.putting || 0) > 0 ? '0%' : '-100%'})`,
+    }}/>
+  </Box>
+  <Typography variant="body2" sx={{ ml: 1, minWidth: 50, textAlign: 'right' }}>
+    {(strokesGainedData.average?.byCategory.putting || 0) > 0 ? '+' : ''}
+    {strokesGainedData.average?.byCategory.putting || 0}
+  </Typography>
+</Box>
+</Box>
+</CardContent>
+</Card>
+</Grid>
+
+{/* Individual Round Strokes Gained */}
+<Grid item xs={12}>
+<Card>
+<CardContent>
+<Typography variant="h6" gutterBottom>Strokes Gained by Round</Typography>
+<TableContainer component={Paper} variant="outlined">
+<Table>
+  <TableHead>
+    <TableRow>
+      <TableCell>Date</TableCell>
+      <TableCell>Course</TableCell>
+      <TableCell align="right">Overall</TableCell>
+      <TableCell align="right">Tee to Green</TableCell>
+      <TableCell align="right">Off Tee</TableCell>
+      <TableCell align="right">Approach</TableCell>
+      <TableCell align="right">Around</TableCell>
+      <TableCell align="right">Putting</TableCell>
+    </TableRow>
+  </TableHead>
+  <TableBody>
+    {sortedRounds.map((round) => {
+      // Use a safe default object to prevent errors
+      const sgPlaceholder = {
+        total: 0,
+        byCategory: {
+          tee: 0,
+          approach: 0,
+          around: 0,
+          putting: 0,
+          teeToGreen: 0
+        }
+      };
+      
+      return (
+        <TableRow key={round.id}>
+          <TableCell>{new Date(round.dateCreated).toLocaleDateString()}</TableCell>
+          <TableCell>{round.courseName}</TableCell>
+          <TableCell align="right" sx={{ 
+            color: sgPlaceholder.total > 0 ? 'success.main' : 'error.main',
+            fontWeight: 'bold'
+          }}>
+            {sgPlaceholder.total > 0 ? '+' : ''}{sgPlaceholder.total}
+          </TableCell>
+          <TableCell align="right" sx={{ 
+            color: sgPlaceholder.byCategory.teeToGreen > 0 ? 'success.main' : 'error.main' 
+          }}>
+            {sgPlaceholder.byCategory.teeToGreen > 0 ? '+' : ''}{sgPlaceholder.byCategory.teeToGreen}
+          </TableCell>
+          <TableCell align="right" sx={{ 
+            color: sgPlaceholder.byCategory.tee > 0 ? 'success.main' : 'error.main' 
+          }}>
+            {sgPlaceholder.byCategory.tee > 0 ? '+' : ''}{sgPlaceholder.byCategory.tee}
+          </TableCell>
+          <TableCell align="right" sx={{ 
+            color: sgPlaceholder.byCategory.approach > 0 ? 'success.main' : 'error.main' 
+          }}>
+            {sgPlaceholder.byCategory.approach > 0 ? '+' : ''}{sgPlaceholder.byCategory.approach}
+          </TableCell>
+          <TableCell align="right" sx={{ 
+            color: sgPlaceholder.byCategory.around > 0 ? 'success.main' : 'error.main' 
+          }}>
+            {sgPlaceholder.byCategory.around > 0 ? '+' : ''}{sgPlaceholder.byCategory.around}
+          </TableCell>
+          <TableCell align="right" sx={{ 
+            color: sgPlaceholder.byCategory.putting > 0 ? 'success.main' : 'error.main' 
+          }}>
+            {sgPlaceholder.byCategory.putting > 0 ? '+' : ''}{sgPlaceholder.byCategory.putting}
+          </TableCell>
+        </TableRow>
+      );
+    })}
+  </TableBody>
+</Table>
+</TableContainer>
+</CardContent>
+</Card>
+</Grid>
+</Grid>
+)}
+</>
+) : (
+<Grid item xs={12}>
+<Card sx={{ textAlign: 'center', py: 4 }}>
+<CardContent>
+<Typography variant="h6" color="text.secondary">
+No rounds recorded yet
+</Typography>
+<Button
+variant="outlined"
+startIcon={<AddIcon />}
+onClick={() => navigate('/rounds/new')}
+sx={{ mt: 2 }}
+>
+Record Your First Round
+</Button>
+</CardContent>
+</Card>
+</Grid>
+)
+)}
+
+<Dialog
+open={deleteDialogOpen}
+onClose={() => setDeleteDialogOpen(false)}
+>
+<DialogTitle>Delete Round</DialogTitle>
+<DialogContent>
+<DialogContentText>
+Are you sure you want to delete this round at {roundToDelete?.courseName}? 
+This action cannot be undone.
+</DialogContentText>
+</DialogContent>
+<DialogActions>
+<Button onClick={() => setDeleteDialogOpen(false)}>Cancel</Button>
+<Button onClick={handleConfirmDelete} color="error" variant="contained">
+Delete
+</Button>
+</DialogActions>
+</Dialog>
+</Container>
+</MainLayout>
+);
 }

@@ -18,11 +18,21 @@ import CourseSelector from './components/CourseSelector';
 import HoleEntry from './components/HoleEntry';
 import { courses } from '../../data/courses';
 import { roundsService } from '../../services/roundsService';
+import RoundInfoDialog from './components/RoundInfoDialog';
+
 
 export default function EnterRound({ roundId: propRoundId }) {
   // Use either the prop or the URL parameter
   const { roundId: paramRoundId } = useParams();
   const roundId = propRoundId || paramRoundId;
+
+  const [roundInfoDialogOpen, setRoundInfoDialogOpen] = useState(false);
+  const [roundInfo, setRoundInfo] = useState({
+    handicap: null,
+    gender: null,
+    weather: null,
+    notes: ''
+  });
   
   console.log('EnterRound - Component rendering with roundId:', roundId);
   
@@ -36,6 +46,55 @@ export default function EnterRound({ roundId: propRoundId }) {
   const navigate = useNavigate();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+
+  // 3. Add this useEffect to open the dialog when starting a new round:
+  useEffect(() => {
+    // If not editing and we've just selected a course and tee, show the round info dialog
+    if (!isEditing && selectedCourse && selectedTee) {
+      setRoundInfoDialogOpen(true);
+    }
+  }, [selectedCourse, selectedTee, isEditing]);
+
+  // 4. Add this handler function for when round info is confirmed:
+  const handleRoundInfoConfirm = (info) => {
+    setRoundInfo(info);
+    setRoundInfoDialogOpen(false);
+  };
+
+  // 5. Update the handleRoundComplete function to include roundInfo:
+  const handleRoundComplete = async () => {
+    if (!canFinishRound()) {
+      return;
+    }
+
+    try {
+      const roundToSave = {
+        courseId: selectedCourse,
+        courseName: courseData.name,
+        selectedTee,
+        holes: roundData,
+        totalHoles: Object.keys(roundData).length,
+        dateCreated: new Date().toISOString(),
+        // Add the round info
+        handicap: roundInfo.handicap,
+        gender: roundInfo.gender,
+        weather: roundInfo.weather,
+        notes: roundInfo.notes
+      };
+
+      if (isEditing) {
+        await roundsService.updateRound(roundId, roundToSave);
+      } else {
+        console.log('Saving new round:', roundToSave);
+        await roundsService.saveRound(roundToSave);
+      }
+      
+      navigate('/dashboard');
+    } catch (error) {
+      console.error('Error saving round:', error);
+      // Here you could add error handling UI if needed
+    }
+  };
 
   // Load existing round data if editing
   useEffect(() => {
@@ -156,35 +215,6 @@ export default function EnterRound({ roundId: propRoundId }) {
   const canFinishRound = () => {
     return Object.keys(roundData).length > 0;
   };
-  
-  const handleRoundComplete = async () => {
-    if (!canFinishRound()) {
-      return;
-    }
-  
-    try {
-      const roundToSave = {
-        courseId: selectedCourse,
-        courseName: courseData.name,
-        selectedTee,
-        holes: roundData,
-        totalHoles: Object.keys(roundData).length,
-        dateCreated: new Date().toISOString()
-      };
-  
-      if (isEditing) {
-        await roundsService.updateRound(roundId, roundToSave);
-      } else {
-        console.log('Saving new round:', roundToSave);
-        await roundsService.saveRound(roundToSave);
-      }
-      
-      navigate('/dashboard');
-    } catch (error) {
-      console.error('Error saving round:', error);
-      // Here you could add error handling UI if needed
-    }
-  };
 
   const handleFinishEarly = () => {
     if (!canFinishRound()) {
@@ -203,10 +233,20 @@ export default function EnterRound({ roundId: propRoundId }) {
   return (
     <MainLayout>
       <Container maxWidth="md" sx={{ py: 4 }}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
-          <Typography variant="h4" gutterBottom>
-            {isEditing ? 'Edit Round' : 'Enter Round'}
-          </Typography>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
+        <Typography variant="h4" gutterBottom>
+          {isEditing ? 'Edit Round' : 'Enter Round'}
+        </Typography>
+        <Box sx={{ display: 'flex', gap: 2 }}>
+          {selectedCourse && selectedTee && !isEditing && (
+            <Button
+              variant="outlined"
+              color="secondary"
+              onClick={() => setRoundInfoDialogOpen(true)}
+            >
+              Edit Round Info
+            </Button>
+          )}
           {selectedCourse && selectedTee && (
             <Button
               variant="outlined"
@@ -218,6 +258,7 @@ export default function EnterRound({ roundId: propRoundId }) {
             </Button>
           )}
         </Box>
+      </Box>
 
         <CourseSelector
           selectedCourse={selectedCourse}
@@ -328,6 +369,11 @@ export default function EnterRound({ roundId: propRoundId }) {
           </DialogActions>
         </Dialog>
       </Container>
+      <RoundInfoDialog
+  open={roundInfoDialogOpen}
+  onClose={() => setRoundInfoDialogOpen(false)}
+  onConfirm={handleRoundInfoConfirm}
+/>
     </MainLayout>
   );
 }

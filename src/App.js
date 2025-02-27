@@ -15,6 +15,8 @@ import EditRound from './pages/rounds/EditRound';
 import Dashboard from './pages/dashboard/Dashboard';
 import FirebaseTest from './components/FirebaseTest';
 import { useNavigate } from 'react-router-dom';
+import ProfileSettings from './pages/profile/ProfileSettings';
+
 
 // Create a theme context
 export const ColorModeContext = React.createContext({ toggleColorMode: () => {} });
@@ -45,6 +47,14 @@ function App() {
               <Route path="/" element={<MarketingPage />} />
               <Route path="/signin" element={<SignIn />} />
               <Route path="/signup" element={<SignUp />} />
+              <Route
+                path="/profile"
+                element={
+                  <ProtectedRoute>
+                    <ProfileSettings />
+                  </ProtectedRoute>
+                }
+              />
               <Route 
                 path="/dashboard" 
                 element={
